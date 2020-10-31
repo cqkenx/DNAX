@@ -1,0 +1,76 @@
+#!/bin/sh
+ 
+# Database info
+DB_USER="dumper"
+DB_PASS="..."
+DB_HOST="..."
+# Database array
+DB_NAME=("hotel" "food" "foodweb")
+# Others vars
+BIN_DIR="/usr/bin"      #the mysql bin path
+BCK_DIR="/home/mysql-backups"  #the backup file directory
+DATE=`date +%F`
+# create file
+mkdir $BCK_DIR/$DATE
+# TODO
+# /usr/bin/mysqldump --opt -ubatsing -pbatsingpw -hlocalhost timepusher > /mnt/mysqlBackup/db_`date +%F`.sql
+for var in ${DB_NAME[@]};
+do
+  $BIN_DIR/mysqldump --opt --single-transaction --master-data=2 -u$DB_USER -p$DB_PASS -h$DB_HOST $DB_NAME > $BCK_DIR/$DATE/db_$var.sql
+done
+
+[root@test-huanqiu ~]# crontab -e
+#每个星期日凌晨3:00执行完全备份脚本
+0 3 * * 0 /bin/bash -x /home/sysdba/script/Mysql-FullyBak.sh >/dev/null 2>&1
+#周一到周六凌晨3:00做增量备份
+0 3 * * 1-6 /bin/bash -x /home/sysdba/script//Mysql-DailyBak.sh >/dev/null 2>&1
+
+ 4）手动执行上面两个脚本，测试下备份效果
+[root@test-huanqiu backup]# pwd
+/home/mysql/backup
+[root@test-huanqiu backup]# mkdir daily
+[root@test-huanqiu backup]# ll
+total 4
+drwxr-xr-x. 2 root root 4096 Nov 29 11:29 daily
+[root@test-huanqiu backup]# ll daily/
+total 0
+
+先执行增量备份脚本
+[root@test-huanqiu backup]# sh /root/Mysql-DailyBak.sh 
+[root@test-huanqiu backup]# ll
+total 8
+-rw-r--r--. 1 root root 121 Nov 29 11:29 bak.log
+drwxr-xr-x. 2 root root 4096 Nov 29 11:29 daily
+[root@test-huanqiu backup]# ll daily/
+total 8
+-rw-r-----. 1 root root 152 Nov 29 11:29 mysql-binlog.000030
+-rw-r-----. 1 root root 152 Nov 29 11:29 mysql-binlog.000031
+[root@test-huanqiu backup]# cat bak.log 
+mysql-binlog.000030 copying
+mysql-binlog.000031 copying
+mysql-binlog.000032 skip!
+2016年11月29日 11:29:32 Bakup succ!
+
+然后执行全量备份脚本
+[root@test-huanqiu backup]# sh /root/Mysql-FullyBak.sh 
+20161129.sql
+[root@test-huanqiu backup]# ll
+total 152
+-rw-r--r--. 1 root root 145742 Nov 29 11:30 20161129.sql.tgz
+-rw-r--r--. 1 root root 211 Nov 29 11:30 bak.log
+drwxr-xr-x. 2 root root 4096 Nov 29 11:30 daily
+[root@test-huanqiu backup]# ll daily/
+total 0
+[root@test-huanqiu backup]# cat bak.log 
+mysql-binlog.000030 copying
+mysql-binlog.000031 copying
+mysql-binlog.000032 skip!
+2016年11月29日 11:29:32 Bakup succ!
+开始:2016年11月29日 11:30:38 结束:2016年11月29日 11:30:38 20161129.sql.tgz succ
+
+###定时清理之前的 文件
+#!/bin/sh
+find /home/mysql_backups -mtime +30 -name "*.*" -exec rm -Rf {} \;
+
+
+
